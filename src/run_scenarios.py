@@ -30,10 +30,10 @@ type_of_model = 'TD' #MO or TD
 nbr_tds = 12  # number of Typical Days (only relevant for TD evaluation)
 
 # file where results (costs and if transition succeeded) are stored
-results_file = 'scenarios_acc_ren.csv'
+results_file = 'scenarios_pf.csv'
 
 # base name for file where the technologies and resources used at each phase of the transition are stored
-results_tech_file_base = 'scenarios_acc_ren_technologies'
+results_tech_file_base = 'scenarios_pf_technologies'
 
 # number of unexpected events evaluated
 n_unexpected_events = 1000
@@ -51,8 +51,8 @@ OR myopic foresight settings
 N_year_opti = [10] #10 means myopic foresight - optimize using rolling horizon
 N_year_overlap = [5] #5 means overlap between phases to modify decisions when future becomes more clear, i.e., myopic foresight
 '''
-N_year_opti = [10]
-N_year_overlap = [5]
+N_year_opti = [30]
+N_year_overlap = [0]
 
 # start over and wipe the results file
 start_over = True
@@ -66,7 +66,7 @@ input_data_file = 'PES_data_year_related_acc_h2.dat' #accelerate hydrogen early-
 input_data_file = 'PES_data_year_related_no_nuclear.dat' #no nuclear early-stage decision (works only for TD)
 input_data_file = 'PES_data_year_related_myopic_baseline.dat' #myopic baseline early-stage decision (works only for TD)
 '''
-input_data_file = 'PES_data_year_related_acc_ren.dat' #no specific early-stage decision (works for TD and MO)
+input_data_file = 'PES_data_year_related.dat' #no specific early-stage decision (works for TD and MO)
 
 #######################
 ### inputs end here ###
