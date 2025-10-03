@@ -100,8 +100,10 @@ set BOILERS	:=	IND_BOILER_GAS	IND_BOILER_WOOD	IND_BOILER_OIL	IND_BOILER_COAL	IND
 ## PARAMETERS presented in Table 2.																														
 param i_rate := 	0.015	; # part [2.7.4]																												
 param epsilon := 	1.0	; # part [2.7.4]
+param penalty_per_ton := 500 ;
 
-##New PARAEMTERS for PATHWAY:																														
+
+##New PARAEMTERS for PATHWAY:
 param max_inv_phase :=																														
 2015_2020 Infinity																														
 2020_2025 Infinity																													
@@ -125,4 +127,12 @@ param diff_2015_phase :=
 param c_grid_extra :=	3.68E+02	;	# cost to reinforce the grid due to intermittent renewable energy penetration. See 2.2.2
 																														
 param power_density_pv :=	0.2367	;																												
-param power_density_solar_thermal :=	0.2857	;																																																									
+param power_density_solar_thermal :=	0.2857	;
+
+param: prev_year :=
+  YEAR_2025 YEAR_2020
+  YEAR_2030 YEAR_2025
+  YEAR_2035 YEAR_2030
+  YEAR_2040 YEAR_2035
+  YEAR_2045 YEAR_2040
+  YEAR_2050 YEAR_2045;

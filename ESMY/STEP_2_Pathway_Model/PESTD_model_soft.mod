@@ -161,6 +161,11 @@ param solar_area	 {YEARS} >= 0; # Maximum land available for PV deployment [km2]
 param power_density_pv >=0 default 0;# Maximum power irradiance for PV.
 param power_density_solar_thermal >=0 default 0;# Maximum power irradiance for solar thermal.
 
+param prev_year {y in YEARS_WND diff YEAR_ONE}, symbolic;
+param penalty_per_ton > 0;
+
+param include_2050 binary;
+
 ##Additional parameter (not presented in the paper)
 param total_time := sum {t in PERIODS, h in HOUR_OF_PERIOD [t], td in TYPICAL_DAY_OF_PERIOD [t]} (t_op [h, td]); # [h]. added just to simplify equations
 
@@ -188,6 +193,8 @@ var TotalGWPTransition >=0;
 var Delta_change {PHASE,TECHNOLOGIES} >=0;
 
 var Gwp_tot_cost >=0;
+
+var gwp_slack {y in YEARS_WND diff YEAR_ONE} >= 0;
 
 ##Independent variables [Table 3] :
 var Share_mobility_public {y in YEARS} >= share_mobility_public_min [y], <= share_mobility_public_max [y]; # %_Public: Ratio [0; 1] public mobility over total passenger mobility
@@ -469,8 +476,12 @@ subject to peak_lowT_dhn {y in YEARS_WND diff YEAR_ONE}:
 #-----------------------------------------------------------------------------------------------------------------------
 
 # [Eq. 34]  constraint to reduce the GWP subject to gwp_limit :
-subject to minimum_GWP_reduction  {y in YEARS_WND diff YEAR_ONE} :
-	TotalGWP [y] <= gwp_limit [y];
+subject to minimum_GWP_reduction {y in YEARS_WND diff YEAR_ONE} :
+    TotalGWP [y] <= gwp_limit [y] + gwp_slack[y];
+
+subject to cumulative_GWP_limit_if_2050:
+    include_2050 = 0
+    or sum {y in YEARS_WND} TotalGWP[y] <= sum {y in YEARS_WND} gwp_limit[y];
 
 # [Eq. XX] Constraint to limit the emissions below a budget (gwp_limit_transition) 
 subject to minimum_GWP_transition  : # category: GWP_calc
@@ -593,12 +604,12 @@ subject to maxInvestment {p in PHASE_WND}:
 ### OBJECTIVE FUNCTION ###
 ##########################
 
+var RealTotalTransitionCost >=0; #Overall transition cost.
+subject to New_totalTransitionCost_calculation :
+    RealTotalTransitionCost = C_tot_capex + C_tot_opex + Gwp_tot_cost ;
 
-# var TotalTransitionCost >=0; #Overall transition cost.
-# subject to New_totalTransitionCost_calculation :
-# 	TotalTransitionCost = C_tot_capex + C_tot_opex;
-# minimize obj: TotalTransitionCost;
-# Can choose between TotalTransitionCost_calculation and TotalGWP and TotalCost
-minimize  TotalTransitionCost: C_tot_capex + C_tot_opex + Gwp_tot_cost;#sum {y in YEARS} TotalCost [y];
-# subject to New_totalTransitionCost_calculation :
-# 	TotalTransitionCost = C_tot_capex + C_tot_opex;
+minimize TotalTransitionCost:
+    C_tot_capex +
+    C_tot_opex +
+    Gwp_tot_cost +
+    sum {y in YEARS_WND diff YEAR_ONE} penalty_per_ton * gwp_slack[y];

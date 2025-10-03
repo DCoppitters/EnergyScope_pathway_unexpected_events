@@ -3,17 +3,21 @@ from pathlib import Path
 import time
 import pandas as pd
 import csv
+import numpy as np
+import re
 
 curr_dir = Path(os.path.dirname(__file__))
 
 pymodPath = os.path.abspath(os.path.join(curr_dir.parent, 'pylib'))
 sys.path.insert(0, pymodPath)
 
-from ampl_object import AmplObject
 from ampl_preprocessor import AmplPreProcessor
 from ampl_collector import AmplCollector
 from ampl_uq import AmplUQ
 import pickle
+
+from ampl_object import AmplObject
+#############
 
 #########################
 ### inputs start here ###
@@ -26,46 +30,30 @@ This because the specific starting conditions were simulated considering TD eval
 NOTE the MO model can be used for quick evaluations. Only works without an early-stage decision specified (line 58)
 '''
 
-type_of_model = 'TD' #MO or TD
+type_of_model = 'MO' #MO or TD
 nbr_tds = 12  # number of Typical Days (only relevant for TD evaluation)
 
-# file where results (costs and if transition succeeded) are stored
-results_file = 'scenarios_pf.csv'
+# base name for result files (without extension)
+results_file_base = 'scenarios_pf_test'
 
-# base name for file where the technologies and resources used at each phase of the transition are stored
-results_tech_file_base = 'scenarios_pf_technologies'
+# file where results (costs and if transition succeeded) are stored
+results_file = results_file_base + '.csv'
+
+# file where the technologies and resources used at each phase of the transition are stored
+results_tech_file_base = results_file_base
 
 # number of unexpected events evaluated
-n_unexpected_events = 1000
+n_unexpected_events = 100
 
 # starting point in the unexpected event scenarios file
 start_point = 0
 
-'''
-determine the optimization approach.
-EITHER perfect foresight settings
-# N_year_opti = [30] #30 means perfect foresight - optimize over entire energy transition
-# N_year_overlap = [0] #0 means no overlap needed, i.e., perfect foresight
-
-OR myopic foresight settings
-N_year_opti = [10] #10 means myopic foresight - optimize using rolling horizon
-N_year_overlap = [5] #5 means overlap between phases to modify decisions when future becomes more clear, i.e., myopic foresight
-'''
-N_year_opti = [30]
-N_year_overlap = [0]
-
 # start over and wipe the results file
 start_over = True
 
-'''
-# the input data file with costs, availabilities for the technologies and resources: PICK ONE
-input_data_file = 'PES_data_year_related.dat' #no specific early-stage decision (works for TD and MO)
-input_data_file = 'PES_data_year_related_delay_ren.dat' #delay renewables early-stage decision (works only for TD) 
-input_data_file = 'PES_data_year_related_acc_ren.dat' #accelerate renewables early-stage decision (works only for TD)
-input_data_file = 'PES_data_year_related_acc_h2.dat' #accelerate hydrogen early-stage decision (works only for TD)
-input_data_file = 'PES_data_year_related_no_nuclear.dat' #no nuclear early-stage decision (works only for TD)
-input_data_file = 'PES_data_year_related_myopic_baseline.dat' #myopic baseline early-stage decision (works only for TD)
-'''
+N_year_opti = [30] #30 means perfect foresight - optimize over entire energy transition
+N_year_overlap = [0] #0 means no overlap needed, i.e., perfect foresight
+
 input_data_file = 'PES_data_year_related.dat' #no specific early-stage decision (works for TD and MO)
 
 #######################
@@ -222,12 +210,9 @@ if __name__ == '__main__':
 
                 ampl = AmplObject(mod_1_path, mod_2_path, dat_path, ampl_options, type_model=type_of_model)
 
-                # Define GWP limits in a dictionary
-                gwp_limits = {f'YEAR_{year}': 124000 - index * 20098.84665 for index, year in
-                              enumerate(range(2020, 2055, 5))}
-
-                # Set the parameters using the precomputed dictionary
-                ampl.set_params('gwp_limit', gwp_limits)
+                # set carbon budget and end emissions in 2050
+                ampl.set_params('gwp_limit_transition',1.5e6)
+                ampl.set_params('gwp_limit',{('YEAR_2050'): 5815.11})
 
                 ampl_uq = AmplUQ(ampl)
                 years_wnd = ['YEAR_2025', 'YEAR_2030', 'YEAR_2035', 'YEAR_2040', 'YEAR_2045', 'YEAR_2050']
@@ -240,6 +225,7 @@ if __name__ == '__main__':
 
                 solve_result = ampl.run_ampl()
                 ampl.get_results()
+                # ab = ampl.results
 
                 if i == 0:
                     ampl_collector.init_storage(ampl)
@@ -250,6 +236,10 @@ if __name__ == '__main__':
                 ampl_collector.update_storage(ampl, curr_years_wnd, i)
 
                 ampl.set_init_sol()
+
+                # Extract results after solve
+                total_gwp_dictres = ampl.get_elem('TotalGWP').to_dict()['TotalGWP']
+                del total_gwp_dictres['YEAR_2015']
 
                 elapsed_i = time.time() - t_i
                 print('Time to solve the window #' + str(i + 1) + ': ', elapsed_i)
@@ -264,8 +254,11 @@ if __name__ == '__main__':
         pkl_file = os.path.join(pth_output_all, case_study, '_Results.pkl')
         open_file = open(pkl_file, "rb")
         loaded_results = pickle.load(open_file)
+
+        # print(out)
         open_file.close()
 
+        total_gwp_dict = ampl.get_elem('TotalGWPTransition') #.to_dict()['TotalGWP']
         gwp_tot = 1e8
         for year in years:
             gwp_tot_new = \
@@ -274,7 +267,7 @@ if __name__ == '__main__':
 
             # store the lowest gwp among the years (0 means the transition failed)
             gwp_tot = min(gwp_tot, gwp_tot_new)
-        fail = 0 if 0 < gwp_tot <= gwp_limits['YEAR_2050']+0.1 else 1
+        fail = 0 if 0 < gwp_tot <= 5815.21 else 1
         transition_cost = 0 if fail == 1 else loaded_results['Transition_cost'].loc[
             loaded_results['Transition_cost'].index == 'YEAR_2050', 'Transition_cost'
         ].values[0]
@@ -287,8 +280,11 @@ if __name__ == '__main__':
         for key in ['avail_pv', 'avail_wind_on', 'avail_wind_off', 'demand']:
             sample_ex_event[f'sum_{key}'] = sum(sample_ex_event[f'{key}_{year}'] for year in range(2035, 2051, 5))
 
-        # Convert sample_ex_event to a pandas Series, concatenate with new_data, and reset the index
-        sample = pd.concat([pd.Series(sample_ex_event), new_data]).reset_index(drop=True)
+        total_gwp_array = np.array(list(total_gwp_dictres.values()))
+        sample = pd.concat([
+            pd.Series(sample_ex_event),
+            new_data,
+        ]).reset_index(drop=True)
 
         # Open the existing CSV file in append mode ('a')
         with open(results_file, 'a', newline='') as file:

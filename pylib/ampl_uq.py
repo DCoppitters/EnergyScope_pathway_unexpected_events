@@ -27,7 +27,6 @@ class AmplUQ:
         project_path = Path(__file__).parents[1]
         self.uq_file = os.path.join(project_path,'uncertainties','uc_final.xlsx')
 
-
     def transcript_unexpected_events(self, uncer_params, years_wnd, technologies, resources):
 
         up = uncer_params
@@ -169,15 +168,24 @@ class AmplUQ:
         ups.update({f'ccgt_nh3_{year}': 0.00001 for year in range(2035, 2055, 5)})
         ups.update({f'nh3_cracking_{year}': 0.00001 for year in range(2035, 2055, 5)})
 
+        # Define common thresholds
+        nuclear_years = [2050, 2045, 2040, 2035]
+        nuclear_thresholds = [0.25, 0.5, 0.75, 1]
+
+
+        # Define years for nuclear and reversed years for other technologies
+        common_years = [2040, 2045, 2050]
+        common_thresholds = [0.33, 0.66, 1]
+
         # Define thresholds and corresponding years for each technology
         tech_thresholds = {
-            'nuclear': ([0.25, 0.5, 0.75, 1], [2050, 2045, 2040, 2035]),
-            'dac': ([0.333, 0.6665, 1.0], [2040, 2045, 2050]),
-            'nuclear_smr': ([0.333, 0.6665, 1.0], [2040, 2045, 2050]),
-            'ccs': ([0.333, 0.6665, 1.0], [2040, 2045, 2050]),
-            'geoth': ([0.333, 0.6665, 1.0], [2040, 2045, 2050]),
-            'ccgt_nh3': ([0.333, 0.6665, 1.0], [2040, 2045, 2050]),
-            'nh3_cracking': ([0.333, 0.6665, 1.0], [2040, 2045, 2050])
+            'nuclear': (nuclear_thresholds, nuclear_years),
+            'dac': (common_thresholds, common_years),
+            'nuclear_smr': (common_thresholds, common_years),
+            'ccs': (common_thresholds, common_years),
+            'geoth': (common_thresholds, common_years),
+            'ccgt_nh3': (common_thresholds, common_years),
+            'nh3_cracking': (common_thresholds, common_years)
         }
 
         # Define a dictionary for technology values
@@ -197,6 +205,22 @@ class AmplUQ:
             for threshold, year in zip(thresholds, years):  # Skip the first threshold as it leaves values at 0
                 if value < threshold:
                     ups[f'{tech}_{year}'] = 0.999999999
+
+        # # Override for DAC and CCS if value > 0.5
+        for tech in ['dac', 'ccs']:
+            value = tech_values[tech]
+            if value < 0.5:
+                for year in tech_thresholds[tech][1]:  # Get years for that tech
+                    ups[f'{tech}_{year}'] = 0.99999999
+            else:
+                for year in tech_thresholds[tech][1]:  # Get years for that tech
+                    ups[f'{tech}_{year}'] = 0.00001
+
+        for threshold, year in zip(*tech_thresholds['ccs']):
+            dac_key = f'dac_{year}'
+            ccs_key = f'ccs_{year}'
+            if dac_key in ups:
+                ups[ccs_key] = ups[dac_key]
 
         # overwrite availability of resources and resistances to change for the target years
         for y in years_wnd:

@@ -532,12 +532,12 @@ class AmplObject:
         c_op_phase_res.sort_index(inplace=True)
         self.results['C_op_phase_res'] = c_op_phase_res
         
-        transition_cost = self.ampl.get_objective('TotalTransitionCost')
-        transition_cost = transition_cost.value()
-
-        # new_transition_cost = self.get_elem('RealTotalTransitionCost')
-        # new_transition_cost = new_transition_cost['RealTotalTransitionCost'][0]
+        # transition_cost = self.ampl.get_objective('TotalTransitionCost')
         # transition_cost = transition_cost.value()
+
+        new_transition_cost = self.get_elem('RealTotalTransitionCost')
+        transition_cost = new_transition_cost['RealTotalTransitionCost'][0]
+        # transition_cost = new_transition_cost.value()
 
         year = self.sets['YEARS_WND'][-1]
         transition_cost = pd.DataFrame([transition_cost],index=[year])
@@ -653,7 +653,7 @@ class AmplObject:
         gwp_cost.index.set_names('Years',inplace=True)
         for y in self.sets['YEARS_WND']:
             if not(y in self.sets['YEAR_ONE']):
-                gwp_cost.loc[y] = -self.ampl.get_constraint('minimum_GWP_reduction')[y].dual()
+                gwp_cost.loc[y] = 0. #-self.ampl.get_constraint('minimum_GWP_reduction')[y].dual()
 
         # gwp_limit = self.get_elem('adjusted_gwp_limit').reset_index()
 

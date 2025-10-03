@@ -27,7 +27,7 @@ Unless required by applicable law or agreed to in writing, software distributed 
 
 # How to Run the Model #
 
-The model can be executed from the script `run_scenarios.py`, located in the `src` folder. Detailed instructions for setting up the problem are provided in that script.
+The model can be executed from the scripts `run_scenarios_pf.py` and `run_scenarios_myo.py`, located in the `src` folder. Detailed instructions for setting up the problem are provided in those scripts.
 
 ---
 

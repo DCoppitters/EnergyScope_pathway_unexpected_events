@@ -104,7 +104,7 @@ param re_share_primary {YEARS} >= 0 default 0; # re_share [-]: minimum share of 
 param limit_LT_renovation {YEARS} >= 0 default 0.33; # renovation limit [-]: renovation limit over the years
 param limit_pass_mob_changes {YEARS} >= 0 default 0.5; # renovation limit [-]: renovation limit over the years
 param limit_freight_changes {YEARS} >= 0 default 0.5; # renovation limit [-]: renovation limit over the years
-param gwp_limit {YEARS} >= 0 default 0;    # [ktCO2-eq./year] maximum gwp emissions allowed.
+param gwp_limit {YEARS} >= 0 default Infinity;    # [ktCO2-eq./year] maximum gwp emissions allowed.
 param share_mobility_public_min {YEARS} >= 0, <= 1 default 0; # %_public,min [-]: min limit for penetration of public mobility over total mobility 
 param share_mobility_public_max {YEARS} >= 0, <= 1 default 0; # %_public,max [-]: max limit for penetration of public mobility over total mobility 
 # Share train vs truck in freight transportation
@@ -149,6 +149,9 @@ param elec_max_import_capa  {YEARS} >=0;
 param solar_area	 {YEARS} >= 0; # Maximum land available for PV deployment [km2]
 param power_density_pv >=0 default 0;# Maximum power irradiance for PV.
 param power_density_solar_thermal >=0 default 0;# Maximum power irradiance for solar thermal.
+
+param prev_year {y in YEARS_WND diff YEAR_ONE}, symbolic;
+param penalty_per_ton > 0;
 
 
 ##Additional parameter (not presented in the paper)
@@ -279,7 +282,7 @@ subject to op_cost_calc {y in YEARS_UP_TO union YEARS_WND, i in RESOURCES}:
 
 # [Eq. 6]
 subject to totalGWP_calc {y in YEARS_UP_TO union YEARS_WND}:
-	TotalGWP [y] =  sum {i in RESOURCES} GWP_op [y,i];
+	TotalGWP [y] =  sum {i in RESOURCES} GWP_op [y,i] - Res [y, "CO2_CAPTURED"];
 	#JUST RESOURCES : TotalGWP [y] =  sum {i in RESOURCES} GWP_op [y,i];
 	#BASED ON LCA:    TotalGWP [y] = sum {j in TECHNOLOGIES} (GWP_constr [y,j] / lifetime [y,j]) + sum {i in RESOURCES} GWP_op [y,i];
 	
@@ -293,7 +296,7 @@ subject to gwp_op_calc {y in YEARS_UP_TO union YEARS_WND, i in RESOURCES}:
 
 # [Eq. XX] total transition gwp calculation
 subject to totalGWPTransition_calculation : # category: GWP_calc
-	TotalGWPTransition = TotalGWP ["YEAR_2020"] + sum {p in PHASE_UP_TO union PHASE_WND,y_start in PHASE_START [p],y_stop in PHASE_STOP [p]}  (t_phase * (TotalGWP [y_start] + TotalGWP [y_stop])/2);
+	TotalGWPTransition = sum {p in PHASE_UP_TO union PHASE_WND,y_start in PHASE_START [p],y_stop in PHASE_STOP [p]}  (t_phase * (TotalGWP [y_start] + TotalGWP [y_stop])/2);
 	
 ## Multiplication factor
 #-----------------------
