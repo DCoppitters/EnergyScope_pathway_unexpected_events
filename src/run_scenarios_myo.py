@@ -3,6 +3,8 @@ from pathlib import Path
 import time
 import pandas as pd
 import csv
+import pickle
+import numpy as np
 
 curr_dir = Path(os.path.dirname(__file__))
 
@@ -13,21 +15,7 @@ sys.path.insert(0, pymodPath)
 from ampl_preprocessor import AmplPreProcessor
 from ampl_collector import AmplCollector
 from ampl_uq import AmplUQ
-import pickle
-import numpy as np
-
 from ampl_object_soft import AmplObject
-
-#########################
-### inputs start here ###
-#########################
-'''
-choose type of model: monthly (MO) or typical days (TD).
-NOTE that the specific early stage decisions available only work under TD evaluations (as presented in the paper).
-This because the specific starting conditions were simulated considering TD evaluations.
-
-NOTE the MO model can be used for quick evaluations. Only works without an early-stage decision specified (line 58)
-'''
 
 def adjust_gwp_limits(used_gwp_yearly, total_gwp_limits, current_years):
     # Calculate cumulative overshoot/undershoot up to the start of current window
@@ -74,10 +62,15 @@ def adjust_gwp_limits(used_gwp_yearly, total_gwp_limits, current_years):
 
     return dict(list(adjusted_limits.items())[-2:])
 
+
+#########################
+### inputs start here ###
+#########################
+
 type_of_model = 'MO' #MO or TD
 nbr_tds = 12  # number of Typical Days (only relevant for TD evaluation)
 
-results_file_base = 'scenarios_myopic_acc_h2'
+results_file_base = 'scenarios_myopic_baseline'
 
 '''
 # the input data file with costs, availabilities for the technologies and resources: PICK ONE
@@ -88,8 +81,7 @@ input_data_file = 'PES_data_year_related_no_nuclear.dat' #no nuclear early-stage
 input_data_file = 'PES_data_year_related_myopic_baseline.dat' #myopic baseline early-stage decision 
 '''
 
-input_data_file = 'PES_data_year_related_acc_h2.dat' #accelerate hydrogen early-stage decision
-
+input_data_file = 'PES_data_year_related_myopic_baseline.dat'
 
 ### the pf scenario file reference
 df = pd.read_csv('scenarios_pf.csv')
@@ -358,9 +350,9 @@ for n_evals in range(n_unexpected_events):
                         break
 
             pkl_file = os.path.join(pth_output_all, case_study, '_Results.pkl')
-            open_file = open(pkl_file, "rb")
-            loaded_results = pickle.load(open_file)
-            open_file.close()
+            with open(pkl_file, "rb") as f:
+                loaded_results = pickle.load(f)
+
 
             gwp_tot = 1e8
             for year in years:
@@ -394,13 +386,6 @@ for n_evals in range(n_unexpected_events):
             for key in ['avail_pv', 'avail_wind_on', 'avail_wind_off', 'demand']:
                 sample_ex_event[f'sum_{key}'] = sum(sample_ex_event[f'{key}_{year}'] for year in range(2035, 2051, 5))
 
-            # Convert sample_ex_event to a pandas Series, concatenate with new_data, and reset the index
-            sample = pd.concat([pd.Series(sample_ex_event), new_data]).reset_index(drop=True)
-
-            total_gwp_array = np.array(list(total_gwp_dict.values()))
-            gwp_limits_array =  np.array(list(gwp_limits.values()))
-            adjusted_gwp_limits_array =  np.array(list(adjusted_gwp_limits_all.values()))
-
             sample = pd.concat([
                 pd.Series(sample_ex_event),
                 new_data,
@@ -418,22 +403,16 @@ for n_evals in range(n_unexpected_events):
                     resource_values = []
                     tech_values = []
                     for target_resource in target_resources:
-                        if target_resource in resources['YEAR_%i' % year]:
-                            resource_value = resources['YEAR_%i' % year][target_resource]
-                        else:
-                            resource_value = 0.
+                        resource_value = resources.get(f'YEAR_{year}', {}).get(target_resource, 0.0)
                         resource_values.append(resource_value)
 
                     for target_tech in target_technologies:
-                        if target_tech in assets['YEAR_%i' % year]:
-                            tech_value = assets['YEAR_%i' % year][target_tech]
-                        else:
-                            tech_value = 0  # Set tech_value to 0 if target_tech is not found
+                        tech_value = assets.get(f'YEAR_{year}', {}).get(target_tech, 0.0)
                         tech_values.append(tech_value)
 
                     sample_tech = tech_values + resource_values + [transition_cost, fail]
 
-                    results_tech_file = '%s_%i.csv' %(results_tech_file_base,year)
+                    results_tech_file = f'{results_tech_file_base}_{year}.csv'
 
                     # Open the existing CSV file in append mode ('a')
                     with open(results_tech_file, 'a', newline='') as file:

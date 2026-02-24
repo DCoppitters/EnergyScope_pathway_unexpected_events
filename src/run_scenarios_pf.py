@@ -1,10 +1,11 @@
-import os, sys
+import os
+import sys
 from pathlib import Path
 import time
 import pandas as pd
 import csv
 import numpy as np
-import re
+import pickle
 
 curr_dir = Path(os.path.dirname(__file__))
 
@@ -14,21 +15,12 @@ sys.path.insert(0, pymodPath)
 from ampl_preprocessor import AmplPreProcessor
 from ampl_collector import AmplCollector
 from ampl_uq import AmplUQ
-import pickle
-
 from ampl_object import AmplObject
 #############
 
 #########################
 ### inputs start here ###
 #########################
-'''
-choose type of model: monthly (MO) or typical days (TD).
-NOTE that the specific early stage decisions available only work under TD evaluations (as presented in the paper).
-This because the specific starting conditions were simulated considering TD evaluations.
-
-NOTE the MO model can be used for quick evaluations. Only works without an early-stage decision specified (line 58)
-'''
 
 type_of_model = 'MO' #MO or TD
 nbr_tds = 12  # number of Typical Days (only relevant for TD evaluation)
@@ -53,8 +45,6 @@ start_over = True
 
 N_year_opti = [30] #30 means perfect foresight - optimize over entire energy transition
 N_year_overlap = [0] #0 means no overlap needed, i.e., perfect foresight
-
-input_data_file = 'PES_data_year_related.dat' #no specific early-stage decision (works for TD and MO)
 
 #######################
 ### inputs end here ###
@@ -84,7 +74,12 @@ ampl_options = {'show_stats': 1,
 
 # Read the CSV file into a DataFrame
 df_events = pd.read_csv('samples_unexpected_events.csv')
-names_events = list(df_events.columns) + ['sum_pv', 'sum_wind_on', 'sum_wind_off', 'sum_demand']
+names_events = list(df_events.columns) + [
+    'sum_avail_pv',
+    'sum_avail_wind_on',
+    'sum_avail_wind_off',
+    'sum_demand'
+]
 
 years = [
     2020,
@@ -166,7 +161,7 @@ if __name__ == '__main__':
 
     dat_path += [os.path.join(pth_model, 'PES_data_all_years.dat'),
                  os.path.join(pth_model, 'PES_seq_opti.dat'),
-                 os.path.join(pth_model, input_data_file),
+                 os.path.join(pth_model, 'PES_data_year_related.dat'),
                  os.path.join(pth_model, 'PES_data_efficiencies.dat'),
                  os.path.join(pth_model, 'PES_data_set_AGE_2020.dat')]
     dat_path_0 = dat_path + [os.path.join(pth_model, 'PES_data_remaining.dat'),
@@ -177,7 +172,6 @@ if __name__ == '__main__':
 
     ## Paths
     pth_output_all = os.path.join(curr_dir.parent, 'out')
-
 
     # Iterate over each row in the DataFrame
     for sample_ex_event_index, sample_ex_event in df_events.iloc[n_ex_rows + start_point : n_ex_rows + n_unexpected_events + start_point].iterrows():
@@ -194,6 +188,7 @@ if __name__ == '__main__':
                 n_year_opti, n_year_overlap)
 
             output_folder = os.path.join(pth_output_all, case_study)
+            os.makedirs(output_folder, exist_ok=True)
             output_file = os.path.join(output_folder, '_Results.pkl')
             ampl_0 = AmplObject(mod_1_path, mod_2_path, dat_path_0, ampl_options, type_model=type_of_model)
             ampl_0.clean_history()
@@ -215,8 +210,7 @@ if __name__ == '__main__':
                 ampl.set_params('gwp_limit',{('YEAR_2050'): 5815.11})
 
                 ampl_uq = AmplUQ(ampl)
-                years_wnd = ['YEAR_2025', 'YEAR_2030', 'YEAR_2035', 'YEAR_2040', 'YEAR_2045', 'YEAR_2050']
-                
+
                 # years when unexpected events arrive
                 years_ex_events = ['YEAR_2035', 'YEAR_2040', 'YEAR_2045', 'YEAR_2050']
 
@@ -252,17 +246,13 @@ if __name__ == '__main__':
                     break
 
         pkl_file = os.path.join(pth_output_all, case_study, '_Results.pkl')
-        open_file = open(pkl_file, "rb")
-        loaded_results = pickle.load(open_file)
+        with open(pkl_file, "rb") as f:
+            loaded_results = pickle.load(f)
 
-        # print(out)
-        open_file.close()
-
-        total_gwp_dict = ampl.get_elem('TotalGWPTransition') #.to_dict()['TotalGWP']
         gwp_tot = 1e8
         for year in years:
             gwp_tot_new = \
-            loaded_results['TotalGwp'].loc[loaded_results['TotalGwp'].index == 'YEAR_%i' % year, 'TotalGWP'].values[
+            loaded_results['TotalGwp'].loc[loaded_results['TotalGwp'].index == f'YEAR_{year}', 'TotalGWP'].values[
                 0]
 
             # store the lowest gwp among the years (0 means the transition failed)
@@ -280,7 +270,6 @@ if __name__ == '__main__':
         for key in ['avail_pv', 'avail_wind_on', 'avail_wind_off', 'demand']:
             sample_ex_event[f'sum_{key}'] = sum(sample_ex_event[f'{key}_{year}'] for year in range(2035, 2051, 5))
 
-        total_gwp_array = np.array(list(total_gwp_dictres.values()))
         sample = pd.concat([
             pd.Series(sample_ex_event),
             new_data,
@@ -298,22 +287,16 @@ if __name__ == '__main__':
                 resource_values = []
                 tech_values = []
                 for target_resource in target_resources:
-                    if target_resource in resources['YEAR_%i' % year]:
-                        resource_value = resources['YEAR_%i' % year][target_resource]
-                    else:
-                        resource_value = 0.
+                    resource_value = resources.get(f'YEAR_{year}', {}).get(target_resource, 0.0)
                     resource_values.append(resource_value)
 
                 for target_tech in target_technologies:
-                    if target_tech in assets['YEAR_%i' % year]:
-                        tech_value = assets['YEAR_%i' % year][target_tech]
-                    else:
-                        tech_value = 0  # Set tech_value to 0 if target_tech is not found
+                    tech_value = assets.get(f'YEAR_{year}', {}).get(target_tech, 0.0)
                     tech_values.append(tech_value)
 
                 sample_tech = tech_values + resource_values + [transition_cost, fail]
 
-                results_tech_file = '%s_%i.csv' %(results_tech_file_base,year)
+                results_tech_file = f'{results_tech_file_base}_{year}.csv'
 
                 # Open the existing CSV file in append mode ('a')
                 with open(results_tech_file, 'a', newline='') as file:
