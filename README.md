@@ -37,6 +37,7 @@ The model can be executed from the scripts `run_scenarios_pf.py` and `run_scenar
 
 [2] V. Codina Gironès, S. Moret, F. Maréchal, D. Favrat (2015). "Strategic energy planning for large-scale energy systems: A modelling framework to aid decision-making." *Energy*, 90(PA1), 173–186. https://doi.org/10.1016/j.energy.2015.06.008  
 
-[3] G. Limpens, X. Rixhon, F. Contino, H. Jeanmart (2024). "EnergyScope Pathway: An open-source model to optimise the energy transition pathways of a regional whole-energy system." *Applied Energy*, 358, p.122501.  
+[3] G. Limpens, X. Rixhon, F. Contino, H. Jeanmart (2024). "EnergyScope Pathway: An open-source model to optimise the energy transition pathways of a regional whole-energy system." *Applied Energy*, 358, p.122501. https://doi.org/10.1016/j.apenergy.2023.122501
+  
+[4] D. Coppitters, G. Wiest, L. Göke, F. Contino, A. Bardow, S. Moret (2025). "Identifying dealbreakers and robust policies for the energy transition amid unexpected events." *arXiv preprint*, arXiv:2503.05735. https://doi.org/10.48550/arXiv.2503.05735
 
-[4] D. Coppitters, G. Wiest, L. Göke, F. Contino, A. Bardow, S. Moret (2025). "Identifying dealbreakers and robust policies for the energy transition amid unexpected events."
